@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+      a {
+        color: #515d9b;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      body {
+        color: #333;
+        font-family: "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+        margin: 20pt auto;
+        padding: 0;
+        width: 600pt;
+      }
+
+      .comment-wrapper {
+        margin-bottom: 20pt;
+      }
+
+      .comment {
+        background-color: #f2f1f6;
+        border-bottom: 2pt solid #fff;
+        display: grid;
+        grid-template-columns: 40pt 1fr;
+        grid-template-rows: auto auto;
+        grid-column-gap: 10pt;
+        padding: 10pt;
+        position: sticky;
+      }
+
+      .thumbnail {
+        background-size: cover;
+        background-position: center;
+        bottom: 10pt;
+        /* Stops when reaching the bottom padding. */
+        grid-row: span 2;
+        height: 40pt;
+        width: 40pt;
+        position: sticky;
+        top: 10pt;
+      }
+
+      .content {
+        grid-column: 2;
+      }
+
+      .author {
+        font-weight: bold;
+        margin-right: 5pt;
+      }
+
+      .body {
+        display: inline;
+        color: #000;
+      }
+
+      .timestamp {
+        color: #888;
+        grid-column: 2;
+        margin-left: 5pt;
+        margin-top: 5pt;
+      }
+
+      .nested {
+        margin-left: 20pt;
+        padding-left: 10pt;
+      }
+    </style>
+  </head>
+
+  <body>
+
+  </body>
+  <script src="conversation.js"
+          type="text/javascript"></script>
+  <script type="text/javascript">
+    // Function to convert timestamps to relative time.
+    function timeAgo(date) {
+      const now = new Date();
+      const secondsPast = (now.getTime() - new Date(date).getTime()) / 1000;
+
+      if (secondsPast < 60) {
+        return `${Math.floor(secondsPast)} seconds ago`;
+      } else if (secondsPast < 3600) {
+        return `${Math.floor(secondsPast / 60)} minutes ago`;
+      } else if (secondsPast < 86400) {
+        return `${Math.floor(secondsPast / 3600)} hours ago`;
+      } else if (secondsPast < 2592000) {
+        return `${Math.floor(secondsPast / 86400)} days ago`;
+      } else if (secondsPast < 31536000) {
+        return `${Math.floor(secondsPast / 2592000)} months ago`;
+      } else {
+        return `${Math.floor(secondsPast / 31536000)} years ago`;
+      }
+    }
+
+    function createCommentHtml(comment, nestingLevel = 0) {
+      const commentDiv = document.createElement('div');
+      commentDiv.classList.add('comment-wrapper');
+      commentDiv.setAttribute('data-nesting-level', nestingLevel); // Store the nesting level
+      commentDiv.setAttribute('data-id', comment.id); // Set unique ID for each comment
+
+      const commentContent = document.createElement('div');
+      commentContent.classList.add('comment');
+      commentContent.setAttribute('data-sticky', nestingLevel === 0 ? 'top' : 'child'); // Mark whether it's top-level or a child comment
+
+      // Create the thumbnail
+      const thumbnailDiv = document.createElement('div');
+      thumbnailDiv.classList.add('thumbnail');
+      thumbnailDiv.setAttribute('style', `background-image: url('images/${comment.thumbnail}');`);
+
+      // Create the content section (author and body in one line)
+      const contentDiv = document.createElement('div');
+      contentDiv.classList.add('content');
+
+      const authorDiv = document.createElement('span');
+      authorDiv.classList.add('author');
+      authorDiv.innerHTML = `<a href="#">${comment.author}</a>`;
+
+      const bodyDiv = document.createElement('span');
+      bodyDiv.classList.add('body');
+      bodyDiv.textContent = comment.comment;
+
+      // Create the timestamp
+      const timestampDiv = document.createElement('div');
+      timestampDiv.classList.add('timestamp');
+      timestampDiv.textContent = timeAgo(comment.timestamp);
+
+      // Append author and body to content
+      contentDiv.appendChild(authorDiv);
+      contentDiv.appendChild(bodyDiv);
+
+      // Append content and timestamp to comment div
+      commentContent.appendChild(thumbnailDiv);
+      commentContent.appendChild(contentDiv);
+      commentContent.appendChild(timestampDiv);
+
+      commentDiv.appendChild(commentContent);
+
+      // Recursive creation of replies, increasing the nesting level for child comments
+      if (comment.replies && comment.replies.length > 0) {
+        const repliesDiv = document.createElement('div');
+        repliesDiv.classList.add('nested');
+        comment.replies.forEach(reply => {
+          repliesDiv.appendChild(createCommentHtml(reply, nestingLevel + 1)); // Increase nesting level
+        });
+        commentDiv.appendChild(repliesDiv);
+      }
+
+      return commentDiv;
+    }
+
+    function insertCommentsIntoBody(conversation) {
+      const body = document.body;
+      conversation.conversation.forEach(comment => {
+        const commentHtml = createCommentHtml(comment);
+        body.appendChild(commentHtml);
+      });
+    }
+
+    // Function to calculate the combined height of all ancestors (parents) of a comment
+    function calculateParentHeight(commentWrapper) {
+      let totalHeight = 0;
+      let parentWrapper = commentWrapper.parentElement.closest('.comment-wrapper');
+
+      // Accumulate the heights of all ancestor comments
+      while (parentWrapper) {
+        const parentComment = parentWrapper.querySelector('.comment');
+        const parentHeight = parentComment.offsetHeight;
+        const viewportHeight = window.innerHeight;
+
+        // Check if the parent comment is a long comment
+        const isLongParent = parentHeight > viewportHeight / 3;
+
+        if (isLongParent) {
+          // If it's a long comment, only count the visible lower quarter.
+          totalHeight += viewportHeight / 4;
+        } else {
+          // Otherwise, count the full height of the parent comment
+          totalHeight += parentHeight;
+        }
+
+        parentWrapper = parentWrapper.parentElement.closest('.comment-wrapper');
+      }
+
+      return totalHeight;
+    }
+
+    function adjustStickyPositions() {
+      const commentWrappers = document.querySelectorAll('.comment-wrapper');
+      const viewportHeight = window.innerHeight;
+
+      commentWrappers.forEach((wrapper) => {
+        const comment = wrapper.querySelector('.comment');
+        const isTopLevel = comment.getAttribute('data-sticky') === 'top';
+        const nestingLevel = wrapper.getAttribute('data-nesting-level');
+        const commentHeight = comment.offsetHeight;
+        const thumbnail = comment.querySelector('.thumbnail'); // Get the thumbnail inside the comment
+
+        // Check if the comment height exceeds 1/3 of the viewport height
+        const isLongComment = commentHeight > viewportHeight / 3;
+
+        // Handle sticky behavior for both top-level and child comments
+        if (!isTopLevel) {
+          // For child comments, calculate the combined parent heights
+          const parentHeight = calculateParentHeight(wrapper);
+          comment.style.top = `${parentHeight}px`; // Set child sticky to the total height of its parents
+          comment.style.position = 'sticky';
+        } else {
+          // If it's a long comment, adjust the sticky position to show only the lower third
+          if (isLongComment) {
+            const visibleHeight = viewportHeight / 4;
+            comment.style.top = `-${commentHeight - visibleHeight}px`; // Offset to show only the bottom third
+          } else {
+            comment.style.top = '0'; // For regular comments, keep the top stickiness
+          }
+        }
+
+        // Apply sticky behavior to the thumbnail inside both top-level and child comments
+        if (thumbnail) {
+          const thumbnailHeight = thumbnail.offsetHeight;
+          const commentPaddingTop = parseInt(window.getComputedStyle(comment).paddingTop, 10); // Get the comment's top padding
+          const maxStickyOffset = commentHeight - thumbnailHeight - 10; // 10px padding at the bottom
+
+          // Ensure thumbnail becomes sticky within the comment but respects top padding
+          thumbnail.style.position = 'sticky';
+          thumbnail.style.top = `${commentPaddingTop}px`; // Respect the comment's top padding
+          thumbnail.style.bottom = `10px`; // Stops when reaching the bottom padding of the comment
+          thumbnail.style.zIndex = '10'; // Ensure the thumbnail stays above content while scrolling
+        }
+
+        // Adjust z-index based on nesting level
+        comment.style.zIndex = `${1000 - nestingLevel}`;
+      });
+    }
+
+    // Add event listener to adjust positions on load and resize.
+    window.addEventListener('load', adjustStickyPositions);
+    window.addEventListener('resize', adjustStickyPositions);
+    insertCommentsIntoBody(conversation);
+  </script>
+
+</html>
