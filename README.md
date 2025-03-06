@@ -1,6 +1,6 @@
 # Sticky Comments
 
-<https://github.com/alimahouk/sticky-comments/raw/refs/heads/main/docs/video.mp4>
+![Video](docs/demo.gif)
 
 Threw this together over a few hours: sticky nested comments. When a comment has replies to it, the parent sticks to the top so you always see the full conversation context and are able to tell when a subthread ends. What do you think? 👍 or 👎?
 
